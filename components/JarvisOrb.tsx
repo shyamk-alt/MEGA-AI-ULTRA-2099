@@ -26,8 +26,8 @@ export default function JarvisOrb() {
     const u = new SpeechSynthesisUtterance(t);
     if (voice) u.voice = voice;
     u.pitch = 1.2; u.rate = 0.9; u.volume = 1;
-    u.onstart = () => sceneRef.current?.setState("speaking");
-    u.onend = () => sceneRef.current?.setState("idle");
+    u.onstart = () => (sceneRef.current as any)?.setState("speaking");
+    u.onend = () => (sceneRef.current as any)?.setState("idle");
     window.speechSynthesis.speak(u);
   }, [voice]);
 
@@ -70,7 +70,7 @@ export default function JarvisOrb() {
   const askAI = useCallback(async (txt: string) => {
     if (obey(txt)) { setAiReply(`Okay, opening ${txt}`); return; }
     try {
-      sceneRef.current?.setState("thinking");
+      (sceneRef.current as any)?.setState("thinking");
       setAiReply("Thinking...");
       const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: txt }) });
       const d = await r.json();
@@ -89,7 +89,7 @@ export default function JarvisOrb() {
     if (!SR) { alert("Please use Chrome!"); return; }
     const rec = new SR();
     rec.lang = "en-US";
-    rec.onstart = () => { setListening(true); sceneRef.current?.setState("listening"); };
+    rec.onstart = () => { setListening(true); (sceneRef.current as any)?.setState("listening"); };
     rec.onend = () => setListening(false);
     rec.onresult = (e: any) => { const t = e.results[0][0].transcript; setTranscript(t); askAI(t); };
     rec.start();
