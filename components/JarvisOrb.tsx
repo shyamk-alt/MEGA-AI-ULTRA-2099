@@ -1,101 +1,134 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 export default function JarvisOrb() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [aiReply, setAiReply] = useState("SAY HEY MEGA");
-  const [wake, setWake] = useState(false);
+  const [text, setText] = useState("SAY HEY MEGA");
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const isListeningRef = useRef(false);
 
-  const speak = useCallback((t:string)=>{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.rate=0.9; speechSynthesis.speak(u); },[]);
+  const speak = useCallback((msg: string) => {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(msg);
+    utter.rate = 0.95;
+    utter.pitch = 1;
+    utter.volume = 1;
+    window.speechSynthesis.speak(utter);
+  }, []);
 
-  const openApp = (webUrl:string, appUrl:string) => {
-    // Try to open REAL APP first, if fails open website
-    window.location.href = appUrl;
-    setTimeout(()=> window.open(webUrl,"_blank"), 800);
+  const openApp = (webUrl: string, appUrl: string) => {
+    try {
+      window.location.href = appUrl;
+      setTimeout(() => window.open(webUrl, "_blank"), 1000);
+    } catch {
+      window.open(webUrl, "_blank");
+    }
   };
 
-  const obey = useCallback((txt:string)=>{
-    const c=txt.toLowerCase();
+  const handleCommand = useCallback((command: string) => {
+    const c = command.toLowerCase();
+    setText(`Heard: ${command}`);
 
-    // NO LIMIT - REAL APPS
-    if(c.includes("whatsapp")){
-      openApp("https://web.whatsapp.com","whatsapp://");
-      speak("Opening WhatsApp App"); return true;
-    }
-    if(c.includes("youtube")){
-      if(c.includes("play")||c.includes("search")){
-        const q=txt.replace(/.*youtube|play|search/gi,"").trim();
-        openApp(`https://youtube.com/results?search_query=${encodeURIComponent(q)}`, `vnd.youtube://results?search_query=${encodeURIComponent(q)}`);
-      } else {
-        openApp("https://youtube.com","vnd.youtube://");
+    // === 1. OPEN ANY APP ===
+    if (c.includes("whatsapp")) { setText("Opening WhatsApp..."); speak("Opening WhatsApp"); openApp("https://web.whatsapp.com", "whatsapp://"); return; }
+    if (c.includes("youtube") || c.includes("yt")) { speak("Opening YouTube"); window.open("https://www.youtube.com", "_blank"); setText("Opening YouTube..."); return; }
+    if (c.includes("instagram") || c.includes("insta")) { speak("Opening Instagram"); openApp("https://instagram.com", "instagram://"); setText("Opening Instagram..."); return; }
+    if (c.includes("spotify")) { speak("Opening Spotify"); openApp("https://open.spotify.com", "spotify://"); setText("Opening Spotify..."); return; }
+    if (c.includes("netflix")) { speak("Opening Netflix"); window.open("https://netflix.com", "_blank"); return; }
+    if (c.includes("facebook") || c.includes("fb")) { speak("Opening Facebook"); openApp("https://facebook.com", "fb://"); return; }
+    if (c.includes("twitter") || c.includes(" x app")) { speak("Opening Twitter"); window.open("https://x.com", "_blank"); return; }
+    if (c.includes("telegram")) { speak("Opening Telegram"); openApp("https://web.telegram.org", "tg://"); return; }
+    if (c.includes("gmail") || c.includes("mail")) { speak("Opening Gmail"); window.open("https://mail.google.com", "_blank"); return; }
+    if (c.includes("maps") || c.includes("map")) { speak("Opening Maps"); window.open("https://maps.google.com", "_blank"); return; }
+    if (c.includes("amazon")) { speak("Opening Amazon"); window.open("https://amazon.in", "_blank"); return; }
+    if (c.includes("flipkart")) { speak("Opening Flipkart"); window.open("https://flipkart.com", "_blank"); return; }
+    if (c.includes("chrome") || c.includes("google")) {
+      if (c.includes("search")) {
+        const q = c.replace("search","").replace("google","").replace("hey mega","").trim();
+        speak(`Searching for ${q}`); window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, "_blank"); return;
       }
-      speak("Opening YouTube App"); return true;
     }
-    if(c.includes("instagram")||c.includes("insta")){ openApp("https://instagram.com","instagram://"); speak("Opening Instagram App"); return true; }
-    if(c.includes("spotify")){ openApp("https://open.spotify.com","spotify://"); speak("Opening Spotify"); return true; }
-    if(c.includes("telegram")){ openApp("https://web.telegram.org","tg://"); speak("Opening Telegram"); return true; }
-    if(c.includes("gmail")||c.includes("mail")){ openApp("https://mail.google.com","googlegmail://"); speak("Opening Gmail App"); return true; }
-    if(c.includes("maps")||c.includes("map")){
-      const place=txt.replace(/.*maps|map|open/gi,"").trim() || "";
-      openApp(`https://maps.google.com/?q=${encodeURIComponent(place)}`, `geo:0,0?q=${encodeURIComponent(place)}`);
-      speak("Opening Maps"); return true;
-    }
-    if(c.includes("camera")){ openApp("","camera://"); speak("Opening Camera"); return true; }
-    if(c.includes("call")||c.includes("dial")){
-      const num=txt.match(/\d{10,}/)?.[0] || "";
-      if(num) window.location.href=`tel:${num}`;
-      speak(`Calling ${num}`); return true;
-    }
-    if(c.includes("message")||c.includes("sms")){
-      const num=txt.match(/\d{10,}/)?.[0] || "";
-      window.location.href=`sms:${num}`;
-      speak("Opening Messages"); return true;
-    }
-    if(c.includes("settings")){ window.location.href="app-settings:"; speak("Opening Settings"); return true; }
-    if(c.includes("time")){ speak(`It is ${new Date().toLocaleTimeString()}`); setAiReply(new Date().toLocaleTimeString()); return true; }
-    if(c.includes("flash")||c.includes("torch")){
-      // @ts-ignore
-      if(navigator.mediaDevices){ speak("Torch feature needs Android app"); }
-      return true;
-    }
-    if(c.startsWith("open ")){ const site=txt.replace("open","").trim(); window.open(`https://${site}.com`,"_blank"); speak(`Opening ${site}`); return true; }
-    return false;
-  },[speak]);
 
-  const askAI = useCallback(async(txt:string)=>{
-    if(obey(txt)){ setAiReply(`OPENING ${txt.toUpperCase()}`); return; }
-    setAiReply("THINKING..."); try{
-      const r=await fetch("/api/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:txt})});
-      const d=await r.json(); if(d.reply){ setAiReply(d.reply.toUpperCase()); speak(d.reply); } else throw new Error();
-    }catch{ setAiReply("ADD GROQ_API_KEY IN VERCEL"); }
-  },[obey,speak]);
+    // === 2. SMART COMMANDS ===
+    if (c.includes("time")) { const t = new Date().toLocaleTimeString(); setText(t); speak(`Time is ${t}`); return; }
+    if (c.includes("date")) { const d = new Date().toDateString(); setText(d); speak(`Today is ${d}`); return; }
+    if (c.includes("play")) { const song = c.replace("play","").trim(); speak(`Playing ${song}`); window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(song)}`, "_blank"); return; }
+    if (c.includes("search")) { const q = c.replace("search","").replace("hey mega","").trim(); speak(`Searching ${q}`); window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, "_blank"); return; }
+    if (c.includes("open")) {
+      let site = c.replace("open","").replace("hey mega","").trim().split(" ")[0];
+      if(site){ speak(`Opening ${site}`); window.open(`https://${site}.com`, "_blank"); return; }
+    }
 
-  useEffect(()=>{
-    const canvas=canvasRef.current; if(!canvas) return; const ctx=canvas.getContext("2d")!;
-    let w=canvas.width=innerWidth, h=canvas.height=innerHeight; let particles:any[]=[];
-    for(let i=0;i<1100;i++){ const phi=Math.acos(-1+(2*i)/1100); const theta=Math.sqrt(1100*Math.PI)*phi; particles.push({phi,theta,speed:Math.random()*0.006+0.002}); }
-    let rotY=0; const animate=()=>{
-      ctx.fillStyle="rgba(0,0,0,0.2)"; ctx.fillRect(0,0,w,h); rotY+=wake?0.03:0.009; const cx=w/2,cy=h/2-30;
-      particles.forEach((p:any)=>{p.theta+=p.speed; const x=145*Math.sin(p.phi)*Math.cos(p.theta+rotY); const y=145*Math.sin(p.phi)*Math.sin(p.theta+rotY); const z=145*Math.cos(p.phi); const scale=320/(320+z); const alpha=(z+150)/300; if(alpha>0){ ctx.beginPath(); ctx.arc(cx+x*scale,cy+y*scale,(wake?3:2)*scale,0,Math.PI*2); ctx.fillStyle=wake?`hsla(50,100%,65%,${alpha})`:`hsla(${28+alpha*25},100%,60%,${alpha})`; ctx.shadowBlur=wake?22:12; ctx.shadowColor="#ffae00"; ctx.fill(); }});
-      ctx.strokeStyle=wake?"rgba(255,215,0,1)":"rgba(255,140,0,0.7)"; ctx.lineWidth=2.5; ctx.shadowBlur=30; ctx.shadowColor="#ffae00";
-      for(let i=0;i<2;i++){ ctx.beginPath(); ctx.ellipse(cx,cy,168+i*20,168+i*20,i==0?rotY:rotY+1.6,0,Math.PI*2); ctx.stroke(); }
-      const g=ctx.createRadialGradient(cx,cy,0,cx,cy,60); g.addColorStop(0,"#fff"); g.addColorStop(0.25,wake?"#ffd700":"#ffb700"); g.addColorStop(1,"rgba(255,80,0,0)"); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,wake?70:48,0,Math.PI*2); ctx.fill(); requestAnimationFrame(animate);
-    }; animate();
-  },[wake]);
+    // === 3. AI CHAT FOR EVERYTHING ELSE ===
+    fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: command }),
+    })
+   .then((r) => r.json())
+   .then((data) => {
+        const reply = data.reply || data.text;
+        if (reply) { setText(reply); speak(reply); }
+        else { window.open(`https://www.google.com/search?q=${encodeURIComponent(command)}`, "_blank"); }
+      })
+   .catch(() => {
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(command)}`, "_blank");
+      });
+  }, [speak]);
 
-  useEffect(()=>{
-    const SR=(window as any).webkitSpeechRecognition||(window as any).SpeechRecognition; if(!SR) return; const rec=new SR(); rec.continuous=true; rec.lang="en-US";
-    rec.onend=()=>setTimeout(()=>rec.start(),400);
-    rec.onresult=(e:any)=>{ const t=e.results[e.results.length-1][0].transcript; const lower=t.toLowerCase(); if(lower.includes("hey mega")||wake){ setWake(true); const clean=lower.replace(/hey mega/g,"").trim(); if(clean) askAI(clean); else {setAiReply("YES BOSS?"); speak("Yes boss?");} setTimeout(()=>setWake(false),10000); } else setAiReply(`SAY "HEY MEGA" • ${t.toUpperCase()}`); };
-    try{ rec.start(); }catch{}
-  },[askAI,wake,speak]);
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) { setText("Use Chrome browser"); return; }
+
+    const recog = new SpeechRecognition();
+    recognitionRef.current = recog;
+    recog.continuous = true;
+    recog.interimResults = true;
+    recog.lang = "en-US";
+
+    recog.onstart = () => { isListeningRef.current = true; setIsListening(true); setText("LISTENING..."); };
+    recog.onresult = (e: any) => {
+      let finalText = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+      }
+      if (finalText.trim().length > 2) handleCommand(finalText.trim());
+    };
+    recog.onend = () => { if (isListeningRef.current) { try { recog.start(); } catch {} } else setIsListening(false); };
+    recog.onerror = () => { if (isListeningRef.current) { try { recog.start(); } catch {} } };
+
+    try { recog.start(); isListeningRef.current = true; } catch {}
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    let id: number; let t = 0;
+    const animate = () => {
+      t += 0.015;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const x = canvas.width/2, y = canvas.height/2;
+      const r = 90 + Math.sin(t*2)*8;
+      const grad = ctx.createRadialGradient(x, y, 10, x, y, r);
+      if (isListeningRef.current) { grad.addColorStop(0, "#ffeb3b"); grad.addColorStop(0.5, "#ff9800"); grad.addColorStop(1, "#ff3d00"); }
+      else { grad.addColorStop(0, "#ff5722"); grad.addColorStop(1, "#3e0000"); }
+      ctx.fillStyle = grad; ctx.shadowBlur = 30; ctx.shadowColor = "#ff5500";
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+      id = requestAnimationFrame(animate);
+    };
+    animate();
+    return () => { isListeningRef.current = false; try { recog.stop(); } catch {} cancelAnimationFrame(id); };
+  }, [handleCommand]);
 
   return (
-    <div style={{width:"100vw",height:"100vh",background:"#000",overflow:"hidden",position:"relative",fontFamily:"monospace"}}>
-      <canvas ref={canvasRef} style={{position:"absolute",inset:0}} />
-      <div style={{position:"absolute",top:20,left:20,color:"#ffae00",fontSize:10,letterSpacing:3}}>ULTRON 2099 • NO LIMIT MODE • REAL APPS</div>
-      <div style={{position:"absolute",bottom:90,width:"100%",textAlign:"center"}}><div style={{color:wake?"#ffd700":"#ffae00",fontSize:12,letterSpacing:4}}>{wake?"● GOD MODE - REAL APP ACCESS":"◉ SAY HEY MEGA"}</div><div style={{color:"#fff",marginTop:10,fontSize:13,padding:"0 20px"}}>{aiReply}</div></div>
-      <div style={{position:"absolute",bottom:12,width:"100%",textAlign:"center",color:"#333",fontSize:7,letterSpacing:1}}>SAY: HEY MEGA OPEN WHATSAPP / YOUTUBE / INSTAGRAM / CALL 98765 / MESSAGE / MAPS / CAMERA / SPOTIFY</div>
+    <div
+      onClick={() => { if (!isListeningRef.current && recognitionRef.current) { try { recognitionRef.current.start(); isListeningRef.current = true; setIsListening(true); } catch {} } }}
+      style={{ background: "black", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "white" }}
+    >
+      <canvas ref={canvasRef} width={300} height={300} style={{ cursor: "pointer" }} />
+      <h2 style={{ marginTop: 20, textAlign: "center", padding: "0 20px" }}>{text}</h2>
+      <p style={{ opacity: 0.5, fontSize: 12, marginTop: 10 }}>{isListening? "● LISTENING - Say anything!" : "TAP ORB TO START"}</p>
     </div>
   );
 }
